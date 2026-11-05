@@ -71,6 +71,15 @@ h3{font-family:var(--display);font-weight:700;font-size:19px;margin:0 0 6px;text
 figure{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 figure img{display:block;width:100%;height:auto;aspect-ratio:500/247;object-fit:cover}
 .photo{position:relative}
+.cover{position:relative;min-height:clamp(420px,78vh,760px);display:grid;place-items:center;overflow:hidden;
+  padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
+.cover img{position:absolute;inset:0;width:100%;height:100%;max-width:none;aspect-ratio:auto;object-fit:cover;object-position:center 60%}
+.cover::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,21,32,.30) 0%,rgba(13,21,32,.45) 55%,var(--bg) 100%)}
+.cover h1{position:relative;z-index:1;margin:0;text-align:center;color:#fff;font-size:clamp(56px,11vw,150px);line-height:.92;letter-spacing:-.02em;text-shadow:0 4px 30px rgba(0,0,0,.55)}
+.intro{display:grid;gap:22px;padding-top:8px}
+.intro>p{max-width:60ch;color:var(--muted);margin:0;font-size:18px}
+.intro .stats{margin-top:20px}
+.card .logo{display:block;width:180px;max-width:100%;height:auto;background:#fff;padding:6px 10px;border-radius:8px;margin-bottom:14px}
 .photo .logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:58%;aspect-ratio:490/180;height:auto;background:#fff;padding:8px 12px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);object-fit:contain}
 figcaption{padding:12px 16px;font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px}
 figcaption::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none}
@@ -124,6 +133,19 @@ tbody tr:last-child td{border-bottom:0}
   .hero{grid-template-columns:1fr;gap:28px}
   .stats{grid-template-columns:repeat(2,1fr);gap:20px 12px}
 }
+/* mode édition */
+#editbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface2);border-top:2px solid var(--accent);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+  padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+#editbar p{margin:0;font-size:14px;color:var(--fg);flex:1 1 320px;min-width:0}
+.eb-btns{display:flex;gap:8px}
+button.btn{font:inherit;font-weight:600;font-size:15px;cursor:pointer}
+button.btn.s{background:transparent}
+body.editing main{padding-bottom:120px}
+body.editing [contenteditable]{outline:1px dashed transparent;outline-offset:3px;border-radius:3px;cursor:text}
+body.editing [contenteditable]:hover{outline-color:var(--muted)}
+body.editing [contenteditable]:focus{outline:2px solid var(--accent)}
+body.editing #synth td.x{cursor:pointer}
+body.editing #synth td.x:hover{background:var(--accent-soft)}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}nav a{transition:none}}
 </style>
 </head>
@@ -265,6 +287,7 @@ tbody tr:last-child td{border-bottom:0}
       <tbody id="synth"></tbody>
     </table>
   </div>
+  <button id="addrow" type="button" class="btn s" hidden style="margin-top:12px">+ Ajouter une réalisation</button>
 
   <div class="sub">
     <h3>Certifications</h3>
@@ -346,8 +369,13 @@ tbody tr:last-child td{border-bottom:0}
 
 </main>
 
-<script>
-const rows=[
+<div id="editbar" hidden>
+  <p id="editmsg">Mode édition : clique sur un texte pour le modifier. Dans le tableau, clique sur une case pour la cocher ou la décocher.</p>
+  <div class="eb-btns"><button id="save" type="button" class="btn p">Télécharger ma version</button><button id="quit" type="button" class="btn s">Quitter</button></div>
+</div>
+
+<script id="app">
+const rows=/*ROWS*/[
  ["g","Réalisations en cours de formation"],
  ["Les différents types de cyberattaques (botnet, 0day)",[0]],
  ["Les différents types de hackers (white hat, black hat…)",[0]],
@@ -372,7 +400,7 @@ const rows=[
  ["Remplacement de matériel : téléphones, écrans, PC, souris, claviers, câbles Ethernet",[0,1]],
  ["Dépannage des utilisateurs",[1]],
  ["Déploiement de postes par descente de master PC",[0,4]]
-];
+]/*END*/;
 const tb=document.getElementById("synth");
 rows.forEach(r=>{
   const tr=document.createElement("tr");
@@ -389,6 +417,72 @@ if("IntersectionObserver" in window){
   const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)mark(e.target.id)})},{rootMargin:"-40% 0px -55% 0px"});
   document.querySelectorAll("section").forEach(s=>io.observe(s));
 }
+/* ---------- mode édition : ouvrir le site avec #edition ---------- */
+const EDITABLE="h1,h2,h3,p,li,.tag,.eyebrow,figcaption,.stat b,.stat span,.when,.chip,.legend div,.contact b,.side-foot,.brand b,.brand span,#synth td:not(.x)";
+let editing=false;
+function startEdit(){
+  if(editing)return;editing=true;
+  document.body.classList.add("editing");
+  document.getElementById("editbar").hidden=false;
+  document.getElementById("addrow").hidden=false;
+  document.querySelectorAll(EDITABLE).forEach(el=>{
+    if(el.closest("#editbar"))return;
+    if(el.parentElement&&el.parentElement.closest("[contenteditable]"))return;
+    el.setAttribute("contenteditable","true");el.spellcheck=true;
+  });
+}
+function stopEdit(){
+  editing=false;document.body.classList.remove("editing");
+  document.getElementById("editbar").hidden=true;
+  document.getElementById("addrow").hidden=true;
+  document.querySelectorAll("[contenteditable]").forEach(el=>el.removeAttribute("contenteditable"));
+  if(location.hash==="#edition")history.replaceState(null,"",location.pathname);
+}
+function checkHash(){if(location.hash==="#edition")startEdit();}
+checkHash();addEventListener("hashchange",checkHash);
+/* un texte jaune modifié redevient un texte normal */
+document.addEventListener("input",e=>{
+  if(!editing)return;const s=getSelection();let n=s&&s.anchorNode;
+  while(n&&n!==document.body){if(n.classList&&n.classList.contains("todo")){n.classList.remove("todo");break;}n=n.parentNode;}
+});
+/* pas de retour à la ligne ni de mise en forme collée */
+document.addEventListener("keydown",e=>{if(editing&&e.key==="Enter"&&e.target.isContentEditable){e.preventDefault();e.target.blur();}});
+document.addEventListener("paste",e=>{if(!editing||!e.target.isContentEditable&&!e.target.closest("[contenteditable]"))return;e.preventDefault();document.execCommand("insertText",false,(e.clipboardData||window.clipboardData).getData("text/plain"));});
+/* clic sur une case du tableau : coche / décoche ; liens désactivés sauf le menu */
+document.addEventListener("click",e=>{
+  if(!editing)return;
+  const x=e.target.closest("#synth td.x");
+  if(x){x.innerHTML=x.innerHTML?"":'<span role="img" aria-label="oui"></span>';return;}
+  const a=e.target.closest("a");
+  if(a&&!a.closest("nav")&&!a.closest("#editbar"))e.preventDefault();
+});
+document.getElementById("addrow").addEventListener("click",()=>{
+  const tr=document.createElement("tr");const td=document.createElement("td");td.textContent="Nouvelle réalisation";td.setAttribute("contenteditable","true");tr.appendChild(td);
+  for(let i=0;i<6;i++){const c=document.createElement("td");c.className="x";tr.appendChild(c);}
+  tb.appendChild(tr);td.focus();getSelection().selectAllChildren(td);
+});
+function tableRows(){
+  return [...tb.rows].map(tr=>tr.classList.contains("grp")?["g",tr.cells[0].textContent.trim()]
+    :[tr.cells[0].textContent.trim(),[...tr.cells].slice(1).map((c,i)=>c.querySelector("span")?i:-1).filter(i=>i>=0)]);
+}
+document.getElementById("save").addEventListener("click",()=>{
+  const data=tableRows();
+  const root=document.documentElement.cloneNode(true);
+  root.querySelectorAll("[contenteditable]").forEach(el=>{el.removeAttribute("contenteditable");el.removeAttribute("spellcheck");});
+  root.querySelector("body").classList.remove("editing");
+  if(!root.querySelector("body").className)root.querySelector("body").removeAttribute("class");
+  root.querySelector("#editbar").hidden=true;root.querySelector("#addrow").hidden=true;
+  root.querySelector("#synth").innerHTML="";
+  root.querySelectorAll("nav a").forEach(a=>{a.classList.remove("on");if(!a.className)a.removeAttribute("class");a.removeAttribute("aria-current");});
+  const sc=root.querySelector("#app");
+  sc.textContent=sc.textContent.replace(/\/\*ROWS\*\/[\s\S]*?\/\*END\*\//,"/*ROWS*/"+JSON.stringify(data,null,1)+"/*END*/");
+  const html="<!doctype html>\n"+root.outerHTML;
+  const url=URL.createObjectURL(new Blob([html],{type:"text/html"}));
+  const a=document.createElement("a");a.href=url;a.download="index.html";document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  document.getElementById("editmsg").textContent="Fichier index.html téléchargé. Dépose-le sur GitHub : Add file, puis Upload files.";
+});
+document.getElementById("quit").addEventListener("click",stopEdit);
 </script>
 </body>
 </html>
